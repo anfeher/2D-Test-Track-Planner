@@ -101,6 +101,13 @@ class VisualsNode(Thread, Node):
         # callback:cb_kiwibot_status
         # add here your solution
         self.msg_kiwibot = kiwibot_msg()
+        self.sub_kiwibot_status = self.create_subscription(
+            msg_type=kiwibot_msg,
+            topic="/kiwibot/status",
+            callback=self.cb_kiwibot_status,
+            qos_profile=qos_profile_sensor_data,
+            callback_group=self.callback_group,
+        )
 
         # ------------------------------------------
 
