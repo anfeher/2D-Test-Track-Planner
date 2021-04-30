@@ -27,6 +27,7 @@ from rclpy.node import Node
 
 from utils.python_utils import printlog
 from utils.python_utils import print_list_text
+from utils.python_utils import overlay_image
 
 from usr_msgs.msg import Planner as planner_msg
 from usr_msgs.msg import Kiwibot as kiwibot_msg
@@ -341,7 +342,7 @@ class VisualsNode(Thread, Node):
         # -----------------------------------------
         # Insert you solution here
 
-        return l_img  # remove this line when implement your solution
+        return overlay_image(l_img, s_img, pos, transparency, True)
 
         # -----------------------------------------
 
@@ -360,10 +361,10 @@ class VisualsNode(Thread, Node):
         win_img, robot_coord = self.crop_map(coord=coord)
 
         # Draws robot in maps image
-        # if coord[0] and coord[1]:
-        # win_img = self.draw_robot(
-        #     l_img=win_img, s_img=self._kiwibot_img, pos=robot_coord
-        # )
+        if coord[0] and coord[1]:
+            win_img = self.draw_robot(
+                l_img=win_img, s_img=self._kiwibot_img, pos=robot_coord
+            )
 
         # Draw descriptions
         str_list = [
