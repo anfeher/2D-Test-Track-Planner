@@ -16,7 +16,7 @@ import os
 
 from threading import Thread, Event
 
-# from std_msgs.msg import Int32
+from std_msgs.msg import Int32
 
 import rclpy
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -120,13 +120,13 @@ class VisualsNode(Thread, Node):
 
         # Uncomment
         # Publisher for activating the rear cam streaming
-        # self.msg_path_number = Int32()
-        # self.pub_start_routine = self.create_publisher(
-        #     msg_type=Int32,
-        #     topic="/graphics/start_routine",
-        #     qos_profile=1,
-        #     callback_group=self.callback_group,
-        # )
+        self.msg_path_number = Int32()
+        self.pub_start_routine = self.create_publisher(
+            msg_type=Int32,
+            topic="/graphics/start_routine",
+            qos_profile=1,
+            callback_group=self.callback_group,
+        )
 
         # ---------------------------------------------------------------------
         self.damon = True
@@ -424,8 +424,14 @@ class VisualsNode(Thread, Node):
 
         # -----------------------------------------
         # Insert you solution here
-        pass
-
+        for mark in land_marks:
+            cv2.circle(
+                img=self._win_background,
+                center=(mark.x, mark.y),
+                radius=10,
+                color=(0, 0, 255),
+                thickness=2,
+            )
         # -----------------------------------------
 
     def run(self) -> None:
@@ -470,7 +476,7 @@ class VisualsNode(Thread, Node):
                         msg=f"Code is broken here",
                         msg_type="WARN",
                     )
-                    continue  # remove this line
+                    # continue  # remove this line
                     printlog(
                         msg=f"Routine {chr(key)} was sent to path planner node",
                         msg_type="INFO",
