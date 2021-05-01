@@ -89,7 +89,7 @@ class PlannerNode(Node):
         # ---------------------------------------------------------------------
         # Environment variables for forware and turn profiles
         self._TURN_ACELERATION_FC = float(os.getenv("TURN_ACELERATION_FC", default=0.3))
-        self._TURN_CRTL_POINTS = float(os.getenv("TURN_CRTL_POINTS", default=30))
+        self._TURN_CRTL_POINTS = int(os.getenv("TURN_CRTL_POINTS", default=30))
         self._FORWARE_ACELERATION_FC = float(
             os.getenv("FORWARE_ACELERATION_FC", default=0.3)
         )
@@ -479,8 +479,6 @@ class PlannerNode(Node):
         # "dt": [float](sept of time for angle a, is constant element)
         # Do not forget and respect the keys names
 
-        # ---------------------------------------------------------------------
-
         # Cast to ndarray to work like matrices
         src = np.array(src)
         dst = np.array(dst)
@@ -526,6 +524,8 @@ class PlannerNode(Node):
             {"idx": idx, "pt": tuple(point), "t": t[0][idx], "dt": dt}
             for idx, point in enumerate(np.int16(pos.T))
         ]
+
+        # ---------------------------------------------------------------------
         return way_points
 
     def get_profile_turn(self, dst: float, time: float, pt=0.3, n=30) -> list:
@@ -560,6 +560,39 @@ class PlannerNode(Node):
         # "t": [float](time for angle a),
         # "dt": [float](sept of time for angle a, is constant element)
         # Do not forget and respect the keys names
+
+        # Max velocity for trapezoidal turn profile
+        v = (1 / (1 - pt)) * (dst / time)
+
+        # Evenly spaced times over the time interval
+        t, dt = np.linspace(0.0, time, n, retstep=True)
+        # Adding an axis to get a time matrix, shape = (1,len(t))
+        t = t[np.newaxis, :]
+
+        # Trapezoidal turn profile
+        # Accel segment
+        ta = np.expand_dims(t[t < pt * time], axis=0)
+        aa = (0.5 * v / (pt * time)) * (ta ** 2)
+
+        # Constant segment
+        tc = np.expand_dims(t[(t >= pt * time) & (t <= (1 - pt) * time)], axis=0)
+        ac = v * tc - 0.5 * v * pt * time
+
+        # Deccel part
+        td = np.expand_dims(t[t > (1 - pt) * time], axis=0)
+        ad = (
+            (-0.5 * v / (pt * time)) * (td ** 2)
+            + v * td / pt
+            + (1 - pt - 1 / (2 * pt)) * time * v
+        )
+
+        # Concatenate all angles
+        angles = np.concatenate((aa, ac, ad), axis=1)
+
+        turn_points = [
+            {"idx": idx, "a": float(a), "t": t[0][idx], "dt": dt}
+            for idx, a in enumerate(angles.T)
+        ]
 
         # ---------------------------------------------------------------------
         return turn_points
