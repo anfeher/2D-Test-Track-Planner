@@ -101,12 +101,15 @@ void Speaker::speakerCb(const std_msgs::msg::Int8::SharedPtr msg)
         if (ifile)
         {
             readfd = open((m_path + std::to_string(msg->data) + ".wav").c_str(), O_RDONLY);
-            status = pthread_create(&pthread_id, NULL, (THREADFUNCPTR)&Speaker::PlaySound, this);
         }
         /********************************************
         * PLAY A DEFAULT SOUND IF NOT FOUND THE TRACK FILE
         ********************************************/
-        
+        else
+        {
+            readfd = open((m_path + "2.wav").c_str(), O_RDONLY);
+        }
+        status = pthread_create(&pthread_id, NULL, (THREADFUNCPTR)&Speaker::PlaySound, this);
         /********************************************
         * END CODE 
         ********************************************/
