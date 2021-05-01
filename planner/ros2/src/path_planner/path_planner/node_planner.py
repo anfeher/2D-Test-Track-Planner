@@ -93,7 +93,7 @@ class PlannerNode(Node):
         self._FORWARE_ACELERATION_FC = float(
             os.getenv("FORWARE_ACELERATION_FC", default=0.3)
         )
-        self._FORWARE_CRTL_POINTS = float(os.getenv("FORWARE_CRTL_POINTS", default=30))
+        self._FORWARE_CRTL_POINTS = int(os.getenv("FORWARE_CRTL_POINTS", default=30))
         self._TURN_TIME = float(os.getenv("TURN_TIME", default=3.0))
 
         # ---------------------------------------------------------------------
@@ -481,6 +481,51 @@ class PlannerNode(Node):
 
         # ---------------------------------------------------------------------
 
+        # Cast to ndarray to work like matrices
+        src = np.array(src)
+        dst = np.array(dst)
+
+        # Distance between origin and destination
+        dist = np.sqrt(sum((dst - src) ** 2))
+
+        # Max velocity for trapezoidal speed profile
+        v_max = (1 / (1 - pt)) * (dist / time)
+
+        # Angle of the vector from origin to destination
+        theta = np.arctan2(dst[1] - src[1], dst[0] - src[0])
+        # Speed vector
+        v = v_max * np.array([np.cos(theta), np.sin(theta)]).reshape(2, 1)
+
+        # Evenly spaced times over the time interval
+        t, dt = np.linspace(0.0, time, n, retstep=True)
+        # Adding an axis to get a time matrix, shape = (1,len(t))
+        t = t[np.newaxis, :]
+
+        # Trapezoidal speed profile
+        # Accel segment
+        ta = np.expand_dims(t[t < pt * time], axis=0)
+        pa = (0.5 * v / (pt * time)) * (ta ** 2) + src.reshape(2, 1)
+
+        # Constant segment
+        tc = np.expand_dims(t[(t >= pt * time) & (t <= (1 - pt) * time)], axis=0)
+        pc = v * tc - 0.5 * v * pt * time + src.reshape(2, 1)
+
+        # Deccel part
+        td = np.expand_dims(t[t > (1 - pt) * time], axis=0)
+        pd = (
+            (-0.5 * v / (pt * time)) * (td ** 2)
+            + v * td / pt
+            + (1 - pt - 1 / (2 * pt)) * time * v
+            + src.reshape(2, 1)
+        )
+
+        # Concatenate all positions
+        pos = np.concatenate((pa, pc, pd), axis=1)
+
+        way_points = [
+            {"idx": idx, "pt": tuple(point), "t": t[0][idx], "dt": dt}
+            for idx, point in enumerate(np.int16(pos.T))
+        ]
         return way_points
 
     def get_profile_turn(self, dst: float, time: float, pt=0.3, n=30) -> list:
