@@ -25,6 +25,7 @@ from usr_srvs.srv import Move
 from usr_srvs.srv import Turn
 
 from std_msgs.msg import Int8
+from std_msgs.msg import Empty
 
 from usr_msgs.msg import Kiwibot as kiwibot_status
 
@@ -81,6 +82,19 @@ class KiwibotNode(Node):
             float32 yaw     # time since robot is moving
             bool moving     # Robot is moving
         """
+        self._flag = False  # False: routine is running, True: routine is stop
+
+        # ---------------------------------------------------------------------
+        # Subscribers
+
+        # Subscriber to perform stop/resume routine action
+        self.sub_stop_resume = self.create_subscription(
+            msg_type=Empty,
+            topic="/graphics/stop_resume_routine",
+            callback=self.cb_stop_resume,
+            qos_profile=qos_profile_sensor_data,
+            callback_group=self.callback_group,
+        )
 
         # ---------------------------------------------------------------------
         # Publishers
@@ -146,6 +160,10 @@ class KiwibotNode(Node):
                 if self.status.yaw >= 360:
                     self.status.yaw += -360
 
+                while self._flag:
+                    # Waiting while flag true (routine stop)
+                    pass
+
                 self.pub_bot_status.publish(self.status)
 
                 time.sleep(turn_ref.dt)
@@ -199,6 +217,10 @@ class KiwibotNode(Node):
                 self.status.moving = True
                 self.status.time += wp.dt
 
+                while self._flag:
+                    # Waiting while flag true (routine stop)
+                    pass
+
                 self.pub_bot_status.publish(self.status)
 
                 time.sleep(wp.dt)
@@ -219,6 +241,26 @@ class KiwibotNode(Node):
             response.completed = False
 
         return response
+
+    def cb_stop_resume(self, msg: Empty) -> None:
+        """
+            Callback to stop or resume a routine
+        Args:
+            msg: `Empty` empty message
+        Returns:
+        """
+        if not self._flag:
+            printlog(
+                msg=f"Pause routine",
+                msg_type="INFO",
+            )
+            self._flag = True
+        else:
+            printlog(
+                msg=f"Resume routine",
+                msg_type="INFO",
+            )
+            self._flag = False
 
 
 # =============================================================================

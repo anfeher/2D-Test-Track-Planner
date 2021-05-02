@@ -17,6 +17,7 @@ import os
 from threading import Thread, Event
 
 from std_msgs.msg import Int32
+from std_msgs.msg import Empty
 
 import rclpy
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -125,6 +126,14 @@ class VisualsNode(Thread, Node):
         self.pub_start_routine = self.create_publisher(
             msg_type=Int32,
             topic="/graphics/start_routine",
+            qos_profile=1,
+            callback_group=self.callback_group,
+        )
+
+        # Publisher for stop/resume a routine
+        self.pub_stop_resume = self.create_publisher(
+            msg_type=Empty,
+            topic="/graphics/stop_resume_routine",
             qos_profile=1,
             callback_group=self.callback_group,
         )
@@ -453,7 +462,7 @@ class VisualsNode(Thread, Node):
                 if not self.msg_kiwibot.moving:
                     print_list_text(
                         win_img,
-                        ["press 1 to 9 to start a routine"],
+                        ["press 1 to 9 to start a routine, 'p' to stop/resume"],
                         origin=(
                             win_img.shape[1] - 550,
                             int(win_img.shape[0] * 0.95),
@@ -473,16 +482,19 @@ class VisualsNode(Thread, Node):
                     continue
                 # Key1=1048633 & Key9=1048625
                 elif key >= 48 and key <= 57:
-                    printlog(
-                        msg=f"Code is broken here",
-                        msg_type="WARN",
-                    )
+                    # printlog(
+                    #     msg=f"Code is broken here",
+                    #     msg_type="WARN",
+                    # )
                     # continue  # remove this line
                     printlog(
                         msg=f"Routine {chr(key)} was sent to path planner node",
                         msg_type="INFO",
                     )
                     self.pub_start_routine.publish(Int32(data=int(chr(key))))
+                # Stop/Resume pressing 'p' or 'P'
+                elif key == 112 or key == 80:
+                    self.pub_stop_resume.publish(Empty())
                 else:
                     printlog(
                         msg=f"No action for key {chr(key)} -> {key}",
