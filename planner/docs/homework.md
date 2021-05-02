@@ -2,7 +2,7 @@
 
 ---
 # THE SUPER HYPER POKE DIGI MEGA MUCHI-FANTASTIC FINAL PROJECT (2D-BASIC-PLANNER)
-NAME: **WRITE YOUR NAME HERE**
+NAME: **ANDRÉS FELIPE HERNÁNDEZ GARCÍA**
 
 ---
 **INSTRUCTIONS**:
@@ -135,27 +135,76 @@ Respond below every questions:
 
 1. [Python] Why the robot's image gets distorted when is turning?
 
+Because an image rotation can only be lossless for rotation by a solid angle or 180 degrees. Rotation by arbitrary angle always requires re-compression and also makes the picture softer, the new pixels do not have exactly corresponding pixels on the non-rotated image and therefore have to be calculated based on weighted average of surrounding pixels.
+
+References:
+https://photo.stackexchange.com/questions/15274/does-rotating-a-photo-count-as-a-destructive-editing
+
+https://www.impulseadventure.com/photo/lossless-rotation.html
+
 2. [Python] what is `ReentrantCallbackGroup()` in the python nodes with you own words, give an common life example, and what happen if is not used?
+
+It allows the node to process multiple callbacks without interfering with each other.
+(It's like having a group of people, each person doing an independent action for a common goal)
+If not used only one callback could be executed at a time.
+(It's like just one person taking one action after other)
 
 3. [Python] are Python packages compiled as C++ packages?
 
+No, both differ on the built type of the package:
+  C++ packages: ament_cmake based on Cmake.
+  Python packages: ament_python based on Python setuptools.
+
 4. [Python] Why with some code errors in some nodes the logs are not printed?
+
+Because the file couldn't be compilated, and the node isn't executed.
 
 5. [Control] What other turn or speed profile would you implement, why, and what are the benefits?
 
+The most common move profiles for linear motion systems are trapezoidal and triangular. But in reality, neither of these move profiles is particularly ideal for motion systems—especially those that require smooth travel, high positioning accuracy, or stability at the end of the move. This is because the process of accelerating and decelerating leads to a phenomenon known as jerk.
+
+Jerk is the rate at which acceleration is increasing or decreasing. It is generally undesirable because it creates abrupt jerky motion. In industrial applications such as machine tools, SCARA robots, and dispensing systems, a rapid change in acceleration causes the system to vibrate. The higher the jerk, the stronger the vibrations.
+
+The way to avoid jerk is to reduce the rate of acceleration or deceleration. In motion control systems, this is done by using an S-curve motion profile, instead of the “jerky” trapezoidal profile, where the jerk is (in theory) infinite. To reduce the amount of jerk generated during the move, the transitions at the beginning and end of acceleration and deceleration are smoothed into an “S” shape. The resulting profile is referred to as an S-curve move profile.
+
+References:
+https://www.linearmotiontips.com/how-to-reduce-jerk-in-linear-motion-systems/
+
 6. [C++] What is the mean of the number "15" used in the pthread_kill inside the destructor method?
+
+15 is the portable number for the termination sigal SIGTERM.
+pthread_kill directs that signal to the thread (pthread_id and pthread_id_ambient)
 
 7. [C++] Why are we using UniquePointer instead of SharedPointers to publish a ROS2 message?
 
+Because there will be only one single owner at a time to the object msg(new ...)
+
 8. [C++] Why are we using a m_multi_sound variable? Explain ...
+
+Because it allows the speaker to silence the ambient sound and play an other sound efect, when this sound efect has finished, ambient sound continues.
 
 9. [C++] Why are we freeing the memory allocated by raw pointer "buff" variable and not freeing the memory allocated by the Shared and Unique Pointers? (HARD)
 
-10. [Docker] Explain with your own words what is the instructions `apt-get autoremove && apt-get clean -y for?`
+Because buff was created using the malloc() function which is used to dynamically create a memory block. Since it is dynamic memory from the heap - it is valid memory block even after the function returns.
+If this memory block isn't deallocated using free() leads to accumulation of one-time use memory, which is no longer used by the program. These wasted memory resources can lead to allocation errors when those resources are exhausted.
+
+On the other hand, when a unique_ptr is destroyed, the resource is automatically reclaimed, same behavior when the very last shared_ptr to a resource is destroyed.
+
+10. [Docker] Explain with your own words what is the instructions `apt-get autoremove && apt-get clean -y` for?
+
+apt-get autoremove removes packages that were automatically installed but now their dependent package has either been removed or no longer depends on them.
+
+apt-get clean just removes the package cache.
+
+This is used to safe space in the docker image.
 
 11. [Docker] If you modify a layer what happen with the previous and the next ones?
 
+Docker will try to cache results during builds. If it encounters something that is different from the last build (a modified layer), it will invalidate the cache. Previous layers remains the same but everything from that point on will be re-run fresh.
+
 12. [Docker] Can we change the basic image (`FROM ubuntu:20.04`) from the docker file to another?
+
+Any change to a layer will require rebuilding all layers above it to see that change. Unless the new base image could support all the subsequent layers and commands, it cannot be changed.
 
 Next questions is after you finish the project, it doesn't give points but we really appreciate you feedback:
 * What do you think about this project? is it hard or enough? is it to complicated, is it well structure, explanations and instructions are clear?
@@ -171,9 +220,9 @@ For extra homework we recommend you create a new branch from the developed one w
 3. **[+10%/5.0]**: Implement a method or way to cancel routines and start another one, the could remain in the actual position or return to the origin, or to the closes landmark (with a key).
 4. **[+15%/5.0]**: Implement a method or way to stop/pause the routine and then continue (with a key).
 5. **[+15%/5.0]**: From point 3 start again the music.
-5. **[+15%/5.0]**: From point 4 stop the music and then resume.
-6. **[+5%/5.0]**: Make that the Kiwibot image doesn't get distorted when is turning.
-7. **[+5%/5.0]**: Make that Kiwibot track2.wav don't get distorted.
+6. **[+15%/5.0]**: From point 4 stop the music and then resume.
+7. **[+5%/5.0]**: Make that the Kiwibot image doesn't get distorted when is turning.
+8. **[+5%/5.0]**: Make that Kiwibot track2.wav don't get distorted.
 
 Total possible Extra points: 100% -> 5.0. Maximum total grade: 10.0/5.0. Complete the point it doesn't mean you have 5.0, you have at least 3.0 but for the rest of the grade will evaluate the performance and the beauty of your solution. To complete these points, probably you will have to modify messages, services, or even create new ones, also topics subscribers and publishers, maybe services, who knows :)
 
