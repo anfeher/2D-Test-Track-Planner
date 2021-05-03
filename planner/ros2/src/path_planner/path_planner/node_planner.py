@@ -24,6 +24,7 @@ from rclpy.qos import qos_profile_sensor_data
 
 from std_msgs.msg import Int32
 from std_msgs.msg import Int8
+from std_msgs.msg import Empty
 
 from utils.python_utils import printlog
 
@@ -105,6 +106,7 @@ class PlannerNode(Node):
         self.way_points = {}  # List of waypoints in the path planning routine
 
         self._in_execution = False
+        self._cancel = False  # False: routine is running, True: cancel routine
 
         # Read routines from the yaml file in the configs folder
         self.routines = read_yaml_file(
@@ -128,6 +130,15 @@ class PlannerNode(Node):
             msg_type=Kiwibot,
             topic="/kiwibot/status",
             callback=self.cb_kiwibot_status,
+            qos_profile=qos_profile_sensor_data,
+            callback_group=self.callback_group,
+        )
+
+        # Subscriber to perform cancel routine action
+        self.sub_cancel_routine = self.create_subscription(
+            msg_type=Empty,
+            topic="/graphics/cancel_routine",
+            callback=self.cb_cancel_routine,
             qos_profile=qos_profile_sensor_data,
             callback_group=self.callback_group,
         )
@@ -261,82 +272,98 @@ class PlannerNode(Node):
                 self.pub_speaker.publish(Int8(data=2))
                 for idx, way_point in enumerate(self.way_points["coords"][:-1]):
 
-                    # -------------------------------------------------------
-                    # Calculate the angle to turn the robot
-                    dy = (
-                        self.way_points["coords"][idx][1]
-                        - self.way_points["coords"][idx + 1][1]
-                    )
-                    dx = (
-                        self.way_points["coords"][idx + 1][0]
-                        - self.way_points["coords"][idx][0]
-                    )
-                    ang = np.rad2deg(np.arctan2(dy, dx))
-                    dang = ang - self.kiwibot_state.yaw
+                    if not self._cancel:
+                        # -------------------------------------------------------
+                        # Calculate the angle to turn the robot
+                        dy = (
+                            self.way_points["coords"][idx][1]
+                            - self.way_points["coords"][idx + 1][1]
+                        )
+                        dx = (
+                            self.way_points["coords"][idx + 1][0]
+                            - self.way_points["coords"][idx][0]
+                        )
+                        ang = np.rad2deg(np.arctan2(dy, dx))
+                        dang = ang - self.kiwibot_state.yaw
 
-                    if abs(dang) > 180:
-                        dang += 360
-                    elif dang > 360:
-                        dang -= 360
-                    elif dang > 180:
-                        dang -= 360
-                    elif dang < -180:
-                        dang += 360
+                        if abs(dang) > 180:
+                            dang += 360
+                        elif dang > 360:
+                            dang -= 360
+                        elif dang > 180:
+                            dang -= 360
+                        elif dang < -180:
+                            dang += 360
 
-                    if int(dang):
+                        if int(dang):
 
+                            printlog(
+                                msg=f"turning robot to reference {idx+1}",
+                                msg_type="OKPURPLE",
+                            )
+
+                            # Generate the turning profile to get the robot aligned to the next landmark
+                            self.robot_turn_req.turn_ref = [
+                                TurnRef(
+                                    id=turn_reference["idx"],
+                                    yaw=turn_reference["a"],
+                                    t=turn_reference["t"],
+                                    dt=turn_reference["dt"],
+                                )
+                                for turn_reference in self.get_profile_turn(
+                                    dst=dang,
+                                    time=self._TURN_TIME,
+                                    pt=self._TURN_ACELERATION_FC,
+                                    n=self._TURN_CRTL_POINTS,
+                                )
+                            ]
+
+                            move_resp = self.cli_robot_turn.call(self.robot_turn_req)
+
+                        # -------------------------------------------------------
                         printlog(
-                            msg=f"turning robot to reference {idx+1}",
+                            msg=f"moving robot to landmark {idx}",
                             msg_type="OKPURPLE",
                         )
 
-                        # Generate the turning profile to get the robot aligned to the next landmark
-                        self.robot_turn_req.turn_ref = [
-                            TurnRef(
-                                id=turn_reference["idx"],
-                                yaw=turn_reference["a"],
-                                t=turn_reference["t"],
-                                dt=turn_reference["dt"],
+                        # Generate the waypoints to the next landmark
+                        seg_way_points = self.get_profile_route(
+                            src=self.way_points["coords"][idx],
+                            dst=self.way_points["coords"][idx + 1],
+                            time=self.way_points["times"][idx],
+                            pt=self._FORWARE_ACELERATION_FC,
+                            n=self._FORWARE_CRTL_POINTS,
+                        )
+
+                        # Move the robot to the next landmark
+                        self.robot_move_req.waypoints = [
+                            Waypoint(
+                                id=wp["idx"],
+                                x=int(wp["pt"][0]),
+                                y=int(wp["pt"][1]),
+                                t=wp["t"],
+                                dt=wp["dt"],
                             )
-                            for turn_reference in self.get_profile_turn(
-                                dst=dang,
-                                time=self._TURN_TIME,
-                                pt=self._TURN_ACELERATION_FC,
-                                n=self._TURN_CRTL_POINTS,
-                            )
+                            for wp in seg_way_points
                         ]
 
-                        move_resp = self.cli_robot_turn.call(self.robot_turn_req)
+                        move_resp = self.cli_robot_move.call(self.robot_move_req)
+                    else:
+                        # Move robot to the initial position
+                        self.robot_move_req.waypoints = [
+                            Waypoint(
+                                id=0,
+                                x=int(self.way_points["coords"][0][0]),
+                                y=int(self.way_points["coords"][0][1]),
+                                t=0.0,
+                                dt=0.0,
+                            )
+                        ]
+                        move_resp = self.cli_robot_move.call(self.robot_move_req)
 
-                    # -------------------------------------------------------
-                    printlog(
-                        msg=f"moving robot to landmark {idx}",
-                        msg_type="OKPURPLE",
-                    )
-
-                    # Generate the waypoints to the next landmark
-                    seg_way_points = self.get_profile_route(
-                        src=self.way_points["coords"][idx],
-                        dst=self.way_points["coords"][idx + 1],
-                        time=self.way_points["times"][idx],
-                        pt=self._FORWARE_ACELERATION_FC,
-                        n=self._FORWARE_CRTL_POINTS,
-                    )
-
-                    # Move the robot to the next landmark
-                    self.robot_move_req.waypoints = [
-                        Waypoint(
-                            id=wp["idx"],
-                            x=int(wp["pt"][0]),
-                            y=int(wp["pt"][1]),
-                            t=wp["t"],
-                            dt=wp["dt"],
-                        )
-                        for wp in seg_way_points
-                    ]
-
-                    move_resp = self.cli_robot_move.call(self.robot_move_req)
-
+                        self._in_execution = False
+                        self._cancel = False
+                        break
                 # -------------------------------------------------------
                 if not self._in_execution:
                     printlog(
@@ -368,6 +395,21 @@ class PlannerNode(Node):
             )
 
         self._in_execution = False
+
+    def cb_cancel_routine(self, msg: Empty) -> None:
+        """
+            Callback to cancel a routine
+        Args:
+            msg: `Empty` empty message
+        Returns:
+        """
+        if not self._in_execution:
+            printlog(
+                msg=f"No routine in execution",
+                msg_type="WARN",
+            )
+        else:
+            self._cancel = True
 
     def read_keypoints(self, land_marks_path: str, key_Points: list) -> list:
         """

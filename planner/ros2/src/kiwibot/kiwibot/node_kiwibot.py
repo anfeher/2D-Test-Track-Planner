@@ -83,6 +83,7 @@ class KiwibotNode(Node):
             bool moving     # Robot is moving
         """
         self._flag = False  # False: routine is running, True: routine is stop
+        self._cancel = False  # False: routine is running, True: cancel routine
 
         # ---------------------------------------------------------------------
         # Subscribers
@@ -92,6 +93,15 @@ class KiwibotNode(Node):
             msg_type=Empty,
             topic="/graphics/stop_resume_routine",
             callback=self.cb_stop_resume,
+            qos_profile=qos_profile_sensor_data,
+            callback_group=self.callback_group,
+        )
+
+        # Subscriber to perform cancel routine action
+        self.sub_cancel_routine = self.create_subscription(
+            msg_type=Empty,
+            topic="/graphics/cancel_routine",
+            callback=self.cb_cancel_routine,
             qos_profile=qos_profile_sensor_data,
             callback_group=self.callback_group,
         )
@@ -147,6 +157,11 @@ class KiwibotNode(Node):
 
             for idx, turn_ref in enumerate(request.turn_ref[:-1]):
 
+                # Breaks the cicle to stop updating visual_node
+                if self._cancel:
+                    self._cancel = False
+                    break
+
                 if self._TURN_PRINT_WAYPOINT:
                     printlog(msg=turn_ref, msg_type="INFO")
 
@@ -197,6 +212,11 @@ class KiwibotNode(Node):
 
         try:
             for wp in request.waypoints:
+
+                # Breaks the cicle to stop updating visual_node
+                if self._cancel:
+                    self._cancel = False
+                    break
 
                 if self._FORWARE_PRINT_WAYPOINT:
                     printlog(msg=wp, msg_type="INFO")
@@ -249,18 +269,33 @@ class KiwibotNode(Node):
             msg: `Empty` empty message
         Returns:
         """
-        if not self._flag:
-            printlog(
-                msg=f"Pause routine",
-                msg_type="INFO",
-            )
-            self._flag = True
+        if self.status.moving:
+            if not self._flag:
+                printlog(
+                    msg=f"Pause routine",
+                    msg_type="INFO",
+                )
+                self._flag = True
+            else:
+                printlog(
+                    msg=f"Resume routine",
+                    msg_type="INFO",
+                )
+                self._flag = False
         else:
             printlog(
-                msg=f"Resume routine",
-                msg_type="INFO",
+                msg=f"No routine in execution",
+                msg_type="WARN",
             )
-            self._flag = False
+
+    def cb_cancel_routine(self, msg: Empty) -> None:
+        """
+            Callback to cancel a routine
+        Args:
+            msg: `Empty` empty message
+        Returns:
+        """
+        self._cancel = True
 
 
 # =============================================================================

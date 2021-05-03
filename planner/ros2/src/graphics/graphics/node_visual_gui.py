@@ -138,6 +138,14 @@ class VisualsNode(Thread, Node):
             callback_group=self.callback_group,
         )
 
+        # Publisher for cancel a routine
+        self.pub_cancel_routine = self.create_publisher(
+            msg_type=Empty,
+            topic="/graphics/cancel_routine",
+            qos_profile=1,
+            callback_group=self.callback_group,
+        )
+
         # ---------------------------------------------------------------------
         self.damon = True
         self.run_event = Event()
@@ -462,7 +470,19 @@ class VisualsNode(Thread, Node):
                 if not self.msg_kiwibot.moving:
                     print_list_text(
                         win_img,
-                        ["press 1 to 9 to start a routine, 'p' to stop/resume"],
+                        ["press 1 to 9 to start a routine"],
+                        origin=(
+                            win_img.shape[1] - 550,
+                            int(win_img.shape[0] * 0.9),
+                        ),
+                        color=(0, 0, 255),
+                        line_break=20,
+                        thickness=1,
+                        fontScale=0.8,
+                    )
+                    print_list_text(
+                        win_img,
+                        ["'p' to stop/resume, '0' to cancel"],
                         origin=(
                             win_img.shape[1] - 550,
                             int(win_img.shape[0] * 0.95),
@@ -481,17 +501,21 @@ class VisualsNode(Thread, Node):
                 if key == -1:
                     continue
                 # Key1=1048633 & Key9=1048625
-                elif key >= 48 and key <= 57:
-                    # printlog(
-                    #     msg=f"Code is broken here",
-                    #     msg_type="WARN",
-                    # )
-                    # continue  # remove this line
+                elif key >= 49 and key <= 57:
                     printlog(
                         msg=f"Routine {chr(key)} was sent to path planner node",
                         msg_type="INFO",
                     )
                     self.pub_start_routine.publish(Int32(data=int(chr(key))))
+
+                # Cancel routine pressing '0'
+                elif key == 48:
+                    printlog(
+                        msg=f"Cancel routine command executed",
+                        msg_type="INFO",
+                    )
+                    self.pub_cancel_routine.publish(Empty())
+
                 # Stop/Resume pressing 'p' or 'P'
                 elif key == 112 or key == 80:
                     self.pub_stop_resume.publish(Empty())
